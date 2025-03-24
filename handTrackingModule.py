@@ -1,6 +1,7 @@
 import cv2
 import mediapipe as mp
 import time
+import math
 
 class handDetector():
     def __init__(self, mode=False, maxHands=2, detactionCon=0.5, trackCon=0.5):
@@ -16,8 +17,10 @@ class handDetector():
             min_tracking_confidence=float(self.trackCon)
         )
         self.mpDraw = mp.solutions.drawing_utils
+        self.tipIds = [4,8,12,16,20]
         self.handLmsStyle =  self.mpDraw.DrawingSpec(color = (251,0,207), thickness = 2)
         self.handConnectionsStyle =  self.mpDraw.DrawingSpec(color = (0,255,0), thickness = 8)
+
     def findHands(self,img,draw = True):
         imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         self.results = self.hands.process(imgRGB)
@@ -30,6 +33,9 @@ class handDetector():
     
     def findPosition(self,img, handNumber=0, draw=True):
         landmarkList = []
+        xList=[]
+        yList=[]
+        bbox=[]
         imgHeight = img.shape[0]
         imgWidth = img.shape[1]
         if self.results.multi_hand_landmarks:
@@ -38,11 +44,48 @@ class handDetector():
             for i, lm in enumerate(myHand.landmark):
                 xPosition =int( lm.x *imgWidth)
                 yPosition = int(lm.y * imgHeight)
+                xList.append(xPosition)
+                yList.append(yPosition)
                 # cv2.putText(img, str(i),(xPosition-25,yPosition+5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0,0,255),2)
                 landmarkList.append([i,xPosition,yPosition])
+
+                xmin, xmax = min(xList),max(xList)
+                ymin, ymax = min(yList), max(yList)
+                bbox = xmin, ymin, xmax, ymax
+
                 if i == 4:
                     cv2.circle(img,(xPosition,yPosition), 10,(0,0,255),cv2.FILLED)
-        return landmarkList
+        return landmarkList, bbox
+    
+    def fingersUp(self):
+        fingers = []
+        #thumb
+        if self.landmarkList[self.tipIds[0]][1] > self.landmarkList[self.tipIds[0]-1][1]:
+            fingers.append(1)
+        else:
+            fingers.append(0)
+        #fingers
+        for id in range(1, 5):
+            if self.landmarkList[self.tipIds[id]][2] < self.landmarkList[self.tipIds[id]-2][2]:
+                fingers.append(1)
+            else:
+                fingers.append(0)
+        #totalFingers = fingers.count(1)
+        return fingers
+
+    def findDistance(self, p1, p2, img, draw=True, r=15, t=3):
+        x1, y1 = self.landmarkList[p1][1:]
+        x2, y2 = self.landmarkList[p2][1:]
+        cx, cy = (x1+x2)//2, (y1+y2)//2
+
+        if draw:
+            cv2.line(img, (x1, y1), (x2, y2),(255,0,255),t)
+            cv2.circle(img,(x1,y1), r, (255,0,255),cv2.FILLED)
+            cv2.circle(img,(x2,y2), r, (255,0,255),cv2.FILLED)
+            cv2.circle(img,(cx,cy), r, (0,0,255),cv2.FILLED)
+        length = math.hypot(x2-x1, y2-y1)
+
+        return length, img, [x1, y1, x2, y2, cx, cy]
         
     
 def main():   
@@ -56,8 +99,8 @@ def main():
         # if success:
         img = detector.findHands(img)
         landmarkList = detector.findPosition(img)
-        if len(landmarkList) !=0:
-            print(landmarkList[4])
+        # if len(landmarkList) != 0:
+        #     print(landmarkList[4])
 
         currentTime = time.time()
         fps = 1/(currentTime-previousTime)
