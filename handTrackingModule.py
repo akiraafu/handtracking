@@ -30,33 +30,42 @@ class handDetector():
                 if draw:
                     self.mpDraw.draw_landmarks(img, handLms, self.mpHands.HAND_CONNECTIONS,self.handLmsStyle,self.handConnectionsStyle)
         return img
-    
-    def findPosition(self,img, handNumber=0, draw=True):
-        landmarkList = []
-        xList=[]
-        yList=[]
-        bbox=[]
-        imgHeight = img.shape[0]
-        imgWidth = img.shape[1]
+
+    def findPosition(self, img, handNumber=0, draw=True):
+        self.landmarkList = []
+        xList = []
+        yList = []
+        bbox = []  # Initialize bbox
+
+        imgHeight, imgWidth = img.shape[:2]  # Get image dimensions
+
         if self.results.multi_hand_landmarks:
             myHand = self.results.multi_hand_landmarks[handNumber]
-            #check index number
+
+            # Collect all landmarks
             for i, lm in enumerate(myHand.landmark):
-                xPosition =int( lm.x *imgWidth)
+                xPosition = int(lm.x * imgWidth)
                 yPosition = int(lm.y * imgHeight)
                 xList.append(xPosition)
                 yList.append(yPosition)
-                # cv2.putText(img, str(i),(xPosition-25,yPosition+5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0,0,255),2)
-                landmarkList.append([i,xPosition,yPosition])
 
-                xmin, xmax = min(xList),max(xList)
-                ymin, ymax = min(yList), max(yList)
-                bbox = xmin, ymin, xmax, ymax
+                self.landmarkList.append([i, xPosition, yPosition])
 
+                # Draw a circle on the thumb tip (index 4)
                 if i == 4:
-                    cv2.circle(img,(xPosition,yPosition), 10,(0,0,255),cv2.FILLED)
-        return landmarkList, bbox
-    
+                    cv2.circle(img, (xPosition, yPosition), 10, (0, 0, 255), cv2.FILLED)
+
+            # Now calculate the bounding box AFTER collecting all points
+            if xList and yList:
+                xmin, xmax = min(xList), max(xList)
+                ymin, ymax = min(yList), max(yList)
+                bbox = (xmin, ymin, xmax, ymax)
+
+                # Draw the bounding box
+                if draw:
+                    cv2.rectangle(img, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
+
+        return self.landmarkList, bbox
     def fingersUp(self):
         fingers = []
         #thumb
